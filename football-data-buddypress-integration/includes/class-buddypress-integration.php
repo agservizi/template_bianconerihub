@@ -296,10 +296,13 @@ class Football_Data_BuddyPress_Integration_BP {
     public function show_juventus_match_in_activity($activity_content, $activity) {
         $match_id = bp_activity_get_meta($activity->id, 'juventus_match_event', true);
         if ($match_id) {
-            $matches = $this->api->get_team_matches(109, array('limit' => 10));
+            // Recupera tutte le partite Juventus (limite alto per coprire tutte le stagioni)
+            $matches = $this->api->get_team_matches(109, array('limit' => 200));
             if (!is_wp_error($matches) && isset($matches['matches'])) {
+                $found = false;
                 foreach ($matches['matches'] as $m) {
                     if ($m['id'] == $match_id) {
+                        $found = true;
                         $logo = isset($m['homeTeam']['id']) && $m['homeTeam']['id'] == 109 && isset($m['homeTeam']['crest']) ? $m['homeTeam']['crest'] : (isset($m['awayTeam']['crest']) ? $m['awayTeam']['crest'] : '');
                         $result = isset($m['score']['fullTime']['home']) && isset($m['score']['fullTime']['away']) ? esc_html($m['score']['fullTime']['home']) . ' - ' . esc_html($m['score']['fullTime']['away']) : '-';
                         $arbitro = isset($m['referees'][0]['name']) ? esc_html($m['referees'][0]['name']) : __('Non disponibile', 'football-data-bp');
@@ -348,6 +351,12 @@ class Football_Data_BuddyPress_Integration_BP {
                         break;
                     }
                 }
+                // Se non trovata tra le partite recuperate, mostra avviso
+                if (!$found) {
+                    $activity_content .= '<div class="juventus-match-event" style="border:1px solid #f00;padding:10px;margin-top:10px;background:#fff0f0;">' . __('Partita Juventus non trovata nei dati disponibili.', 'football-data-bp') . '</div>';
+                }
+            } else {
+                $activity_content .= '<div class="juventus-match-event" style="border:1px solid #f00;padding:10px;margin-top:10px;background:#fff0f0;">' . __('Errore nel recupero delle partite Juventus.', 'football-data-bp') . '</div>';
             }
         }
         return $activity_content;
