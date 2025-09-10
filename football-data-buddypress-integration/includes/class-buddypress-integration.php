@@ -264,10 +264,9 @@ class Football_Data_BuddyPress_Integration_BP {
      * Aggiungi selettore partita Juventus al modulo attività BuddyPress
      */
     public function add_juventus_match_selector() {
-        $today = '2025-09-13';
         $competitions = array('SA', 'CL', 'CI', 'SCI');
         $api = new Football_Data_API();
-        $matches = $api->get_juventus_matches_filtered($competitions, $today, 50);
+        $matches = $api->get_juventus_matches_filtered($competitions, null, 50);
         if (is_wp_error($matches) || empty($matches['matches'])) return;
         echo '<select name="juventus_match_event" style="margin-top:10px;">';
         echo '<option value="">' . __('Collega una partita Juventus (opzionale)', 'football-data-bp') . '</option>';
