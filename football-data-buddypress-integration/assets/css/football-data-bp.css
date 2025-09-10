@@ -1,0 +1,97 @@
+/* Football Data BuddyPress Integration Styles */
+
+.football-data-matches {
+    margin: 20px 0;
+}
+
+.football-data-match {
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 15px;
+    margin-bottom: 10px;
+    background: #f9f9f9;
+}
+
+.football-data-match .match-teams {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.football-data-match .match-team {
+    flex: 1;
+    text-align: center;
+}
+
+.football-data-match .match-score {
+    font-size: 24px;
+    font-weight: bold;
+    margin: 0 20px;
+}
+
+.football-data-match .match-status {
+    text-align: center;
+    margin-top: 10px;
+    font-weight: bold;
+}
+
+.football-data-match .match-status.scheduled {
+    color: #007cba;
+}
+
+.football-data-match .match-status.live {
+    color: #d63638;
+}
+
+.football-data-match .match-status.finished {
+    color: #00a32a;
+}
+
+.football-data-standings {
+    margin: 20px 0;
+}
+
+.football-data-standings table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.football-data-standings th,
+.football-data-standings td {
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.football-data-standings th {
+    background: #f1f1f1;
+    font-weight: bold;
+}
+
+.football-data-standings tr.juventus-highlight {
+    background-color: #000000;
+    color: #ffffff;
+    font-weight: bold;
+}
+
+.football-data-standings tr.juventus-highlight td {
+    border-bottom: 2px solid #ffffff;
+}
+
+.football-data-team-info {
+    display: flex;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.football-data-team-info img {
+    width: 50px;
+    height: 50px;
+    margin-right: 15px;
+    border-radius: 50%;
+}
+
+.football-data-team-info h3 {
+    margin: 0;
+}

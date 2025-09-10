@@ -1,0 +1,59 @@
+# Copyright (C) 2025 Tu Nome
+# This file is distributed under the same license as the Football Data BuddyPress Integration package.
+msgid ""
+msgstr ""
+"Project-Id-Version: Football Data BuddyPress Integration 1.0.0\n"
+"Report-Msgid-Bugs-To: https://example.com\n"
+"POT-Creation-Date: 2025-09-10 12:00+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 1.0\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "Football Data BuddyPress Integration"
+msgstr ""
+
+msgid "Integra dati di calcio da football-data.org con BuddyPress per funzionalità social legate al calcio."
+msgstr ""
+
+msgid "Chiave API non configurata"
+msgstr ""
+
+msgid "Errore nella decodifica JSON"
+msgstr ""
+
+msgid "Squadra Preferita"
+msgstr ""
+
+msgid "Seleziona una squadra"
+msgstr ""
+
+msgid "Calcio"
+msgstr ""
+
+msgid "Risultato Partita"
+msgstr ""
+
+msgid "Specificare una competizione"
+msgstr ""
+
+msgid "Errore nel recupero dati"
+msgstr ""
+
+msgid "Football Data"
+msgstr ""
+
+msgid "Impostazioni Football Data"
+msgstr ""
+
+msgid "Chiave API"
+msgstr ""
+
+msgid "Inserisci la tua chiave API da football-data.org"
+msgstr ""
+
+msgid "Impostazioni salvate"
+msgstr ""
