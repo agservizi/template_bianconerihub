@@ -262,6 +262,9 @@ class Football_Data_BuddyPress_Integration_BP {
             __('Risultato Partita', 'football-data-bp')
         );
         add_filter('bp_get_activity_content_body', array($this, 'show_juventus_match_in_activity'), 10, 2);
+        // Hook alternativo per assicurarsi che funzioni
+        add_filter('bp_activity_content_before_save', array($this, 'add_match_to_activity_content'), 10, 2);
+        add_action('bp_activity_entry_meta', array($this, 'display_match_in_activity_meta'), 10);
     }
 
     /**
@@ -287,6 +290,101 @@ class Football_Data_BuddyPress_Integration_BP {
     public function save_juventus_match_to_activity($content, $user_id, $activity_id) {
         if (!empty($_POST['juventus_match_event'])) {
             bp_activity_update_meta($activity_id, 'juventus_match_event', intval($_POST['juventus_match_event']));
+            // Debug: salva anche nel log
+            error_log('Football Data BP: Match ID ' . intval($_POST['juventus_match_event']) . ' salvato per attività ' . $activity_id);
+        }
+    }
+
+    /**
+     * Hook alternativo per aggiungere la partita al contenuto dell'attività
+     */
+    public function add_match_to_activity_content($content, $activity) {
+        $match_id = bp_activity_get_meta($activity->id, 'juventus_match_event', true);
+        if ($match_id) {
+            // Recupera la partita specifica
+            $match_data = $this->api->get_match_by_id($match_id);
+            if (!is_wp_error($match_data) && isset($match_data)) {
+                $logo = isset($match_data['homeTeam']['id']) && $match_data['homeTeam']['id'] == 109 && isset($match_data['homeTeam']['crest']) ? $match_data['homeTeam']['crest'] : (isset($match_data['awayTeam']['crest']) ? $match_data['awayTeam']['crest'] : '');
+                $result = isset($match_data['score']['fullTime']['home']) && isset($match_data['score']['fullTime']['away']) ? esc_html($match_data['score']['fullTime']['home']) . ' - ' . esc_html($match_data['score']['fullTime']['away']) : '-';
+                $info = '<div class="juventus-match-event" style="border:1px solid #ccc;padding:10px;margin-top:10px;background:#f9f9f9;">';
+                if ($logo) $info .= '<img src="' . esc_url($logo) . '" alt="Juventus" style="width:40px;height:40px;vertical-align:middle;margin-right:10px;">';
+                $info .= '<strong>' . __('Evento Juventus:', 'football-data-bp') . '</strong> ';
+                $info .= esc_html($match_data['homeTeam']['name']) . ' vs ' . esc_html($match_data['awayTeam']['name']);
+                $info .= ' <span style="font-weight:bold;">' . $result . '</span>';
+                $info .= '<br><span>' . __('Competizione:', 'football-data-bp') . ' ' . esc_html($match_data['competition']['name']) . ' (' . esc_html($match_data['competition']['code']) . ')</span>';
+                $info .= '<br><span>' . __('Data/Ora:', 'football-data-bp') . ' ' . esc_html(date('d/m/Y H:i', strtotime($match_data['utcDate']))) . '</span>';
+                $info .= '<br><a href="https://www.football-data.org/match/' . esc_attr($match_data['id']) . '" target="_blank">' . __('Dettagli partita', 'football-data-bp') . '</a>';
+                $info .= '</div>';
+                $content .= $info;
+            }
+        }
+        return $content;
+    }
+
+    /**
+     * Hook alternativo per visualizzare la partita nei meta dell'attività
+     */
+    public function display_match_in_activity_meta() {
+        global $activities_template;
+        if (!isset($activities_template->activity)) return;
+
+        $activity = $activities_template->activity;
+        $match_id = bp_activity_get_meta($activity->id, 'juventus_match_event', true);
+
+        if ($match_id) {
+            // Debug: log per verificare che la funzione venga chiamata
+            error_log('Football Data BP: Hook meta chiamato per attività ' . $activity->id . ' con match ' . $match_id);
+
+            // Prima prova: recupera la partita specifica per ID
+            $match_data = $this->api->get_match_by_id($match_id);
+            if (!is_wp_error($match_data) && isset($match_data)) {
+                error_log('Football Data BP: Partita trovata per ID nel meta hook ' . $match_id);
+                $logo = isset($match_data['homeTeam']['id']) && $match_data['homeTeam']['id'] == 109 && isset($match_data['homeTeam']['crest']) ? $match_data['homeTeam']['crest'] : (isset($match_data['awayTeam']['crest']) ? $match_data['awayTeam']['crest'] : '');
+                $result = isset($match_data['score']['fullTime']['home']) && isset($match_data['score']['fullTime']['away']) ? esc_html($match_data['score']['fullTime']['home']) . ' - ' . esc_html($match_data['score']['fullTime']['away']) : '-';
+                $info = '<div class="juventus-match-event" style="border:1px solid #ccc;padding:10px;margin-top:10px;background:#f9f9f9;">';
+                if ($logo) $info .= '<img src="' . esc_url($logo) . '" alt="Juventus" style="width:40px;height:40px;vertical-align:middle;margin-right:10px;">';
+                $info .= '<strong>' . __('Evento Juventus:', 'football-data-bp') . '</strong> ';
+                $info .= esc_html($match_data['homeTeam']['name']) . ' vs ' . esc_html($match_data['awayTeam']['name']);
+                $info .= ' <span style="font-weight:bold;">' . $result . '</span>';
+                $info .= '<br><span>' . __('Competizione:', 'football-data-bp') . ' ' . esc_html($match_data['competition']['name']) . ' (' . esc_html($match_data['competition']['code']) . ')</span>';
+                $info .= '<br><span>' . __('Data/Ora:', 'football-data-bp') . ' ' . esc_html(date('d/m/Y H:i', strtotime($match_data['utcDate']))) . '</span>';
+                $info .= '<br><a href="https://www.football-data.org/match/' . esc_attr($match_data['id']) . '" target="_blank">' . __('Dettagli partita', 'football-data-bp') . '</a>';
+                $info .= '</div>';
+                echo $info;
+            } else {
+                // Fallback: recupera tutte le partite Juventus e cerca quella specifica
+                error_log('Football Data BP: Partita non trovata per ID nel meta hook, provo fallback');
+                $matches = $this->api->get_team_matches(109, array('limit' => 200));
+                if (!is_wp_error($matches) && isset($matches['matches'])) {
+                    $found = false;
+                    foreach ($matches['matches'] as $m) {
+                        if ($m['id'] == $match_id) {
+                            $found = true;
+                            error_log('Football Data BP: Partita trovata nel fallback del meta hook per ID ' . $match_id);
+                            $logo = isset($m['homeTeam']['id']) && $m['homeTeam']['id'] == 109 && isset($m['homeTeam']['crest']) ? $m['homeTeam']['crest'] : (isset($m['awayTeam']['crest']) ? $m['awayTeam']['crest'] : '');
+                            $result = isset($m['score']['fullTime']['home']) && isset($m['score']['fullTime']['away']) ? esc_html($m['score']['fullTime']['home']) . ' - ' . esc_html($m['score']['fullTime']['away']) : '-';
+                            $info = '<div class="juventus-match-event" style="border:1px solid #ccc;padding:10px;margin-top:10px;background:#f9f9f9;">';
+                            if ($logo) $info .= '<img src="' . esc_url($logo) . '" alt="Juventus" style="width:40px;height:40px;vertical-align:middle;margin-right:10px;">';
+                            $info .= '<strong>' . __('Evento Juventus:', 'football-data-bp') . '</strong> ';
+                            $info .= esc_html($m['homeTeam']['name']) . ' vs ' . esc_html($m['awayTeam']['name']);
+                            $info .= ' <span style="font-weight:bold;">' . $result . '</span>';
+                            $info .= '<br><span>' . __('Competizione:', 'football-data-bp') . ' ' . esc_html($m['competition']['name']) . ' (' . esc_html($m['competition']['code']) . ')</span>';
+                            $info .= '<br><span>' . __('Data/Ora:', 'football-data-bp') . ' ' . esc_html(date('d/m/Y H:i', strtotime($m['utcDate']))) . '</span>';
+                            $info .= '<br><a href="https://www.football-data.org/match/' . esc_attr($m['id']) . '" target="_blank">' . __('Dettagli partita', 'football-data-bp') . '</a>';
+                            $info .= '</div>';
+                            echo $info;
+                            break;
+                        }
+                    }
+                    if (!$found) {
+                        echo '<div class="juventus-match-event" style="border:1px solid #f00;padding:10px;margin-top:10px;background:#fff0f0;">' . __('Partita Juventus non trovata nei dati disponibili.', 'football-data-bp') . '</div>';
+                        error_log('Football Data BP: Partita non trovata nei dati disponibili nel meta hook per ID ' . $match_id);
+                    }
+                } else {
+                    echo '<div class="juventus-match-event" style="border:1px solid #f00;padding:10px;margin-top:10px;background:#fff0f0;">' . __('Errore nel recupero delle partite Juventus.', 'football-data-bp') . '</div>';
+                    error_log('Football Data BP: Errore nel recupero partite Juventus nel meta hook per attività ' . $activity->id);
+                }
+            }
         }
     }
 
@@ -296,67 +394,93 @@ class Football_Data_BuddyPress_Integration_BP {
     public function show_juventus_match_in_activity($activity_content, $activity) {
         $match_id = bp_activity_get_meta($activity->id, 'juventus_match_event', true);
         if ($match_id) {
-            // Recupera tutte le partite Juventus (limite alto per coprire tutte le stagioni)
-            $matches = $this->api->get_team_matches(109, array('limit' => 200));
-            if (!is_wp_error($matches) && isset($matches['matches'])) {
-                $found = false;
-                foreach ($matches['matches'] as $m) {
-                    if ($m['id'] == $match_id) {
-                        $found = true;
-                        $logo = isset($m['homeTeam']['id']) && $m['homeTeam']['id'] == 109 && isset($m['homeTeam']['crest']) ? $m['homeTeam']['crest'] : (isset($m['awayTeam']['crest']) ? $m['awayTeam']['crest'] : '');
-                        $result = isset($m['score']['fullTime']['home']) && isset($m['score']['fullTime']['away']) ? esc_html($m['score']['fullTime']['home']) . ' - ' . esc_html($m['score']['fullTime']['away']) : '-';
-                        $arbitro = isset($m['referees'][0]['name']) ? esc_html($m['referees'][0]['name']) : __('Non disponibile', 'football-data-bp');
-                        $stadio = isset($m['venue']) ? esc_html($m['venue']) : __('Non disponibile', 'football-data-bp');
-                        $fase = isset($m['stage']) ? esc_html($m['stage']) : __('Non disponibile', 'football-data-bp');
-                        $goal_home = isset($m['score']['fullTime']['home']) ? intval($m['score']['fullTime']['home']) : 0;
-                        $goal_away = isset($m['score']['fullTime']['away']) ? intval($m['score']['fullTime']['away']) : 0;
-                        // Statistiche avanzate
-                        $marcatori = array();
-                        $gialli = array();
-                        $rossi = array();
-                        $rigori = array();
-                        $sostituzioni = array();
-                        $possesso = isset($m['ballPossession']) ? esc_html($m['ballPossession']) : '';
-                        if (isset($m['events']) && is_array($m['events'])) {
-                            foreach ($m['events'] as $ev) {
-                                if ($ev['type'] === 'GOAL') $marcatori[] = esc_html($ev['player']['name']) . ' (' . esc_html($ev['team']['name']) . ')';
-                                if ($ev['type'] === 'YELLOW_CARD') $gialli[] = esc_html($ev['player']['name']) . ' (' . esc_html($ev['team']['name']) . ')';
-                                if ($ev['type'] === 'RED_CARD') $rossi[] = esc_html($ev['player']['name']) . ' (' . esc_html($ev['team']['name']) . ')';
-                                if ($ev['type'] === 'PENALTY') $rigori[] = esc_html($ev['player']['name']) . ' (' . esc_html($ev['team']['name']) . ')';
-                                if ($ev['type'] === 'SUBSTITUTION') $sostituzioni[] = esc_html($ev['player']['name']) . ' (' . esc_html($ev['team']['name']) . ')';
-                            }
-                        }
-                        $info = '<div class="juventus-match-event" style="border:1px solid #ccc;padding:10px;margin-top:10px;background:#f9f9f9;">';
-                        if ($logo) $info .= '<img src="' . esc_url($logo) . '" alt="Juventus" style="width:40px;height:40px;vertical-align:middle;margin-right:10px;">';
-                        $info .= '<strong>' . __('Evento Juventus:', 'football-data-bp') . '</strong> ';
-                        $info .= esc_html($m['homeTeam']['name']) . ' vs ' . esc_html($m['awayTeam']['name']);
-                        $info .= ' <span style="font-weight:bold;">' . $result . '</span>';
-                        $info .= '<br><span>' . __('Competizione:', 'football-data-bp') . ' ' . esc_html($m['competition']['name']) . ' (' . esc_html($m['competition']['code']) . ')</span>';
-                        $info .= '<br><span>' . __('Stadio:', 'football-data-bp') . ' ' . $stadio . '</span>';
-                        $info .= '<br><span>' . __('Arbitro:', 'football-data-bp') . ' ' . $arbitro . '</span>';
-                        $info .= '<br><span>' . __('Fase:', 'football-data-bp') . ' ' . $fase . '</span>';
-                        $info .= '<br><span>' . __('Goal Juventus:', 'football-data-bp') . ' ' . $goal_home . '</span>';
-                        $info .= '<br><span>' . __('Goal avversario:', 'football-data-bp') . ' ' . $goal_away . '</span>';
-                        $info .= '<br><span>' . __('Stato:', 'football-data-bp') . ' ' . esc_html($m['status']) . '</span>';
-                        $info .= '<br><span>' . __('Data/Ora:', 'football-data-bp') . ' ' . esc_html(date('d/m/Y H:i', strtotime($m['utcDate']))) . '</span>';
-                        if ($possesso) $info .= '<br><span>' . __('Possesso palla:', 'football-data-bp') . ' ' . $possesso . '%</span>';
-                        if (!empty($marcatori)) $info .= '<br><span>' . __('Marcatori:', 'football-data-bp') . ' ' . implode(', ', $marcatori) . '</span>';
-                        if (!empty($gialli)) $info .= '<br><span>' . __('Cartellini gialli:', 'football-data-bp') . ' ' . implode(', ', $gialli) . '</span>';
-                        if (!empty($rossi)) $info .= '<br><span>' . __('Cartellini rossi:', 'football-data-bp') . ' ' . implode(', ', $rossi) . '</span>';
-                        if (!empty($rigori)) $info .= '<br><span>' . __('Rigori:', 'football-data-bp') . ' ' . implode(', ', $rigori) . '</span>';
-                        if (!empty($sostituzioni)) $info .= '<br><span>' . __('Sostituzioni:', 'football-data-bp') . ' ' . implode(', ', $sostituzioni) . '</span>';
-                        $info .= '<br><a href="https://www.football-data.org/team/' . esc_attr($m['homeTeam']['id']) . '" target="_blank">' . __('Dettagli partita', 'football-data-bp') . '</a>';
-                        $info .= '</div>';
-                        $activity_content .= $info;
-                        break;
-                    }
-                }
-                // Se non trovata tra le partite recuperate, mostra avviso
-                if (!$found) {
-                    $activity_content .= '<div class="juventus-match-event" style="border:1px solid #f00;padding:10px;margin-top:10px;background:#fff0f0;">' . __('Partita Juventus non trovata nei dati disponibili.', 'football-data-bp') . '</div>';
-                }
+            // Debug: log per verificare che la funzione venga chiamata
+            error_log('Football Data BP: Visualizzazione partita ' . $match_id . ' per attività ' . $activity->id);
+
+            // Prima prova: recupera la partita specifica per ID
+            $match_data = $this->api->get_match_by_id($match_id);
+            if (!is_wp_error($match_data) && isset($match_data)) {
+                error_log('Football Data BP: Partita trovata per ID ' . $match_id);
+                $logo = isset($match_data['homeTeam']['id']) && $match_data['homeTeam']['id'] == 109 && isset($match_data['homeTeam']['crest']) ? $match_data['homeTeam']['crest'] : (isset($match_data['awayTeam']['crest']) ? $match_data['awayTeam']['crest'] : '');
+                $result = isset($match_data['score']['fullTime']['home']) && isset($match_data['score']['fullTime']['away']) ? esc_html($match_data['score']['fullTime']['home']) . ' - ' . esc_html($match_data['score']['fullTime']['away']) : '-';
+                $info = '<div class="juventus-match-event" style="border:1px solid #ccc;padding:10px;margin-top:10px;background:#f9f9f9;">';
+                if ($logo) $info .= '<img src="' . esc_url($logo) . '" alt="Juventus" style="width:40px;height:40px;vertical-align:middle;margin-right:10px;">';
+                $info .= '<strong>' . __('Evento Juventus:', 'football-data-bp') . '</strong> ';
+                $info .= esc_html($match_data['homeTeam']['name']) . ' vs ' . esc_html($match_data['awayTeam']['name']);
+                $info .= ' <span style="font-weight:bold;">' . $result . '</span>';
+                $info .= '<br><span>' . __('Competizione:', 'football-data-bp') . ' ' . esc_html($match_data['competition']['name']) . ' (' . esc_html($match_data['competition']['code']) . ')</span>';
+                $info .= '<br><span>' . __('Data/Ora:', 'football-data-bp') . ' ' . esc_html(date('d/m/Y H:i', strtotime($match_data['utcDate']))) . '</span>';
+                $info .= '<br><a href="https://www.football-data.org/match/' . esc_attr($match_data['id']) . '" target="_blank">' . __('Dettagli partita', 'football-data-bp') . '</a>';
+                $info .= '</div>';
+                $activity_content .= $info;
+                error_log('Football Data BP: Info partita aggiunta al contenuto attività');
             } else {
-                $activity_content .= '<div class="juventus-match-event" style="border:1px solid #f00;padding:10px;margin-top:10px;background:#fff0f0;">' . __('Errore nel recupero delle partite Juventus.', 'football-data-bp') . '</div>';
+                // Fallback: recupera tutte le partite Juventus e cerca quella specifica
+                error_log('Football Data BP: Partita non trovata per ID, provo fallback');
+                $matches = $this->api->get_team_matches(109, array('limit' => 200));
+                if (!is_wp_error($matches) && isset($matches['matches'])) {
+                    $found = false;
+                    foreach ($matches['matches'] as $m) {
+                        if ($m['id'] == $match_id) {
+                            $found = true;
+                            error_log('Football Data BP: Partita trovata nel fallback per ID ' . $match_id);
+                            $logo = isset($m['homeTeam']['id']) && $m['homeTeam']['id'] == 109 && isset($m['homeTeam']['crest']) ? $m['homeTeam']['crest'] : (isset($m['awayTeam']['crest']) ? $m['awayTeam']['crest'] : '');
+                            $result = isset($m['score']['fullTime']['home']) && isset($m['score']['fullTime']['away']) ? esc_html($m['score']['fullTime']['home']) . ' - ' . esc_html($m['score']['fullTime']['away']) : '-';
+                            $arbitro = isset($m['referees'][0]['name']) ? esc_html($m['referees'][0]['name']) : __('Non disponibile', 'football-data-bp');
+                            $stadio = isset($m['venue']) ? esc_html($m['venue']) : __('Non disponibile', 'football-data-bp');
+                            $fase = isset($m['stage']) ? esc_html($m['stage']) : __('Non disponibile', 'football-data-bp');
+                            $goal_home = isset($m['score']['fullTime']['home']) ? intval($m['score']['fullTime']['home']) : 0;
+                            $goal_away = isset($m['score']['fullTime']['away']) ? intval($m['score']['fullTime']['away']) : 0;
+                            // Statistiche avanzate
+                            $marcatori = array();
+                            $gialli = array();
+                            $rossi = array();
+                            $rigori = array();
+                            $sostituzioni = array();
+                            $possesso = isset($m['ballPossession']) ? esc_html($m['ballPossession']) : '';
+                            if (isset($m['events']) && is_array($m['events'])) {
+                                foreach ($m['events'] as $ev) {
+                                    if ($ev['type'] === 'GOAL') $marcatori[] = esc_html($ev['player']['name']) . ' (' . esc_html($ev['team']['name']) . ')';
+                                    if ($ev['type'] === 'YELLOW_CARD') $gialli[] = esc_html($ev['player']['name']) . ' (' . esc_html($ev['team']['name']) . ')';
+                                    if ($ev['type'] === 'RED_CARD') $rossi[] = esc_html($ev['player']['name']) . ' (' . esc_html($ev['team']['name']) . ')';
+                                    if ($ev['type'] === 'PENALTY') $rigori[] = esc_html($ev['player']['name']) . ' (' . esc_html($ev['team']['name']) . ')';
+                                    if ($ev['type'] === 'SUBSTITUTION') $sostituzioni[] = esc_html($ev['player']['name']) . ' (' . esc_html($ev['team']['name']) . ')';
+                                }
+                            }
+                            $info = '<div class="juventus-match-event" style="border:1px solid #ccc;padding:10px;margin-top:10px;background:#f9f9f9;">';
+                            if ($logo) $info .= '<img src="' . esc_url($logo) . '" alt="Juventus" style="width:40px;height:40px;vertical-align:middle;margin-right:10px;">';
+                            $info .= '<strong>' . __('Evento Juventus:', 'football-data-bp') . '</strong> ';
+                            $info .= esc_html($m['homeTeam']['name']) . ' vs ' . esc_html($m['awayTeam']['name']);
+                            $info .= ' <span style="font-weight:bold;">' . $result . '</span>';
+                            $info .= '<br><span>' . __('Competizione:', 'football-data-bp') . ' ' . esc_html($m['competition']['name']) . ' (' . esc_html($m['competition']['code']) . ')</span>';
+                            $info .= '<br><span>' . __('Stadio:', 'football-data-bp') . ' ' . $stadio . '</span>';
+                            $info .= '<br><span>' . __('Arbitro:', 'football-data-bp') . ' ' . $arbitro . '</span>';
+                            $info .= '<br><span>' . __('Fase:', 'football-data-bp') . ' ' . $fase . '</span>';
+                            $info .= '<br><span>' . __('Goal Juventus:', 'football-data-bp') . ' ' . $goal_home . '</span>';
+                            $info .= '<br><span>' . __('Goal avversario:', 'football-data-bp') . ' ' . $goal_away . '</span>';
+                            $info .= '<br><span>' . __('Stato:', 'football-data-bp') . ' ' . esc_html($m['status']) . '</span>';
+                            $info .= '<br><span>' . __('Data/Ora:', 'football-data-bp') . ' ' . esc_html(date('d/m/Y H:i', strtotime($m['utcDate']))) . '</span>';
+                            if ($possesso) $info .= '<br><span>' . __('Possesso palla:', 'football-data-bp') . ' ' . $possesso . '%</span>';
+                            if (!empty($marcatori)) $info .= '<br><span>' . __('Marcatori:', 'football-data-bp') . ' ' . implode(', ', $marcatori) . '</span>';
+                            if (!empty($gialli)) $info .= '<br><span>' . __('Cartellini gialli:', 'football-data-bp') . ' ' . implode(', ', $gialli) . '</span>';
+                            if (!empty($rossi)) $info .= '<br><span>' . __('Cartellini rossi:', 'football-data-bp') . ' ' . implode(', ', $rossi) . '</span>';
+                            if (!empty($rigori)) $info .= '<br><span>' . __('Rigori:', 'football-data-bp') . ' ' . implode(', ', $rigori) . '</span>';
+                            if (!empty($sostituzioni)) $info .= '<br><span>' . __('Sostituzioni:', 'football-data-bp') . ' ' . implode(', ', $sostituzioni) . '</span>';
+                            $info .= '<br><a href="https://www.football-data.org/team/' . esc_attr($m['homeTeam']['id']) . '" target="_blank">' . __('Dettagli partita', 'football-data-bp') . '</a>';
+                            $info .= '</div>';
+                            $activity_content .= $info;
+                            break;
+                        }
+                    }
+                    // Se non trovata tra le partite recuperate, mostra avviso
+                    if (!$found) {
+                        $activity_content .= '<div class="juventus-match-event" style="border:1px solid #f00;padding:10px;margin-top:10px;background:#fff0f0;">' . __('Partita Juventus non trovata nei dati disponibili.', 'football-data-bp') . '</div>';
+                        error_log('Football Data BP: Partita non trovata nei dati disponibili per ID ' . $match_id);
+                    }
+                } else {
+                    $activity_content .= '<div class="juventus-match-event" style="border:1px solid #f00;padding:10px;margin-top:10px;background:#fff0f0;">' . __('Errore nel recupero delle partite Juventus.', 'football-data-bp') . '</div>';
+                    error_log('Football Data BP: Errore nel recupero partite Juventus per attività ' . $activity->id);
+                }
             }
         }
         return $activity_content;

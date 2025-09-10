@@ -193,5 +193,12 @@ class Football_Data_API {
         }
         return array('matches' => $filtered);
     }
+
+    /**
+     * Recupera una partita specifica per ID
+     */
+    public function get_match_by_id($match_id) {
+        return $this->make_request('matches/' . intval($match_id));
+    }
 }
 ?>
