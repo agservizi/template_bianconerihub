@@ -563,7 +563,7 @@ class Football_Data_BuddyPress_Integration_BP {
         <?php
         // Gestione aggiornamento da GitHub
         if (isset($_POST['update_plugin_github'])) {
-            $github_url = 'https://github.com/TU_USER/TU_REPO/archive/refs/heads/main.zip'; // Sostituisci con il tuo repo
+            $github_url = 'https://github.com/agservizi/template_bianconerihub/archive/refs/heads/main.zip';
             $tmp_file = download_url($github_url);
             if (is_wp_error($tmp_file)) {
                 echo '<div class="notice notice-error"><p>' . __('Errore download da GitHub: ', 'football-data-bp') . esc_html($tmp_file->get_error_message()) . '</p></div>';
