@@ -332,13 +332,17 @@ class Football_Data_BuddyPress_Integration_BP {
         $match_id = bp_activity_get_meta($activity->id, 'juventus_match_event', true);
 
         if ($match_id) {
-            // Debug: log per verificare che la funzione venga chiamata
-            error_log('Football Data BP: Hook meta chiamato per attività ' . $activity->id . ' con match ' . $match_id);
+            // Debug visibile in pagina (solo per admin)
+            if (current_user_can('manage_options')) {
+                echo '<div style="background:#ffff99;padding:5px;margin:5px;border:1px solid #ff0;font-size:11px;">DEBUG: Match ID ' . esc_html($match_id) . ' trovato per attività ' . esc_html($activity->id) . '</div>';
+            }
 
             // Prima prova: recupera la partita specifica per ID
             $match_data = $this->api->get_match_by_id($match_id);
             if (!is_wp_error($match_data) && isset($match_data)) {
-                error_log('Football Data BP: Partita trovata per ID nel meta hook ' . $match_id);
+                if (current_user_can('manage_options')) {
+                    echo '<div style="background:#99ff99;padding:5px;margin:5px;border:1px solid #0f0;font-size:11px;">DEBUG: Partita trovata per ID ' . esc_html($match_id) . '</div>';
+                }
                 $logo = isset($match_data['homeTeam']['id']) && $match_data['homeTeam']['id'] == 109 && isset($match_data['homeTeam']['crest']) ? $match_data['homeTeam']['crest'] : (isset($match_data['awayTeam']['crest']) ? $match_data['awayTeam']['crest'] : '');
                 $result = isset($match_data['score']['fullTime']['home']) && isset($match_data['score']['fullTime']['away']) ? esc_html($match_data['score']['fullTime']['home']) . ' - ' . esc_html($match_data['score']['fullTime']['away']) : '-';
                 $info = '<div class="juventus-match-event" style="border:1px solid #ccc;padding:10px;margin-top:10px;background:#f9f9f9;">';
@@ -352,15 +356,19 @@ class Football_Data_BuddyPress_Integration_BP {
                 $info .= '</div>';
                 echo $info;
             } else {
+                if (current_user_can('manage_options')) {
+                    echo '<div style="background:#ff9999;padding:5px;margin:5px;border:1px solid #f00;font-size:11px;">DEBUG: Partita NON trovata per ID ' . esc_html($match_id) . ', provo fallback</div>';
+                }
                 // Fallback: recupera tutte le partite Juventus e cerca quella specifica
-                error_log('Football Data BP: Partita non trovata per ID nel meta hook, provo fallback');
                 $matches = $this->api->get_team_matches(109, array('limit' => 200));
                 if (!is_wp_error($matches) && isset($matches['matches'])) {
                     $found = false;
                     foreach ($matches['matches'] as $m) {
                         if ($m['id'] == $match_id) {
                             $found = true;
-                            error_log('Football Data BP: Partita trovata nel fallback del meta hook per ID ' . $match_id);
+                            if (current_user_can('manage_options')) {
+                                echo '<div style="background:#99ff99;padding:5px;margin:5px;border:1px solid #0f0;font-size:11px;">DEBUG: Partita trovata nel fallback per ID ' . esc_html($match_id) . '</div>';
+                            }
                             $logo = isset($m['homeTeam']['id']) && $m['homeTeam']['id'] == 109 && isset($m['homeTeam']['crest']) ? $m['homeTeam']['crest'] : (isset($m['awayTeam']['crest']) ? $m['awayTeam']['crest'] : '');
                             $result = isset($m['score']['fullTime']['home']) && isset($m['score']['fullTime']['away']) ? esc_html($m['score']['fullTime']['home']) . ' - ' . esc_html($m['score']['fullTime']['away']) : '-';
                             $info = '<div class="juventus-match-event" style="border:1px solid #ccc;padding:10px;margin-top:10px;background:#f9f9f9;">';
@@ -378,11 +386,9 @@ class Football_Data_BuddyPress_Integration_BP {
                     }
                     if (!$found) {
                         echo '<div class="juventus-match-event" style="border:1px solid #f00;padding:10px;margin-top:10px;background:#fff0f0;">' . __('Partita Juventus non trovata nei dati disponibili.', 'football-data-bp') . '</div>';
-                        error_log('Football Data BP: Partita non trovata nei dati disponibili nel meta hook per ID ' . $match_id);
                     }
                 } else {
                     echo '<div class="juventus-match-event" style="border:1px solid #f00;padding:10px;margin-top:10px;background:#fff0f0;">' . __('Errore nel recupero delle partite Juventus.', 'football-data-bp') . '</div>';
-                    error_log('Football Data BP: Errore nel recupero partite Juventus nel meta hook per attività ' . $activity->id);
                 }
             }
         }
