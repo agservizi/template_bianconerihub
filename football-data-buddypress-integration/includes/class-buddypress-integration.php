@@ -607,7 +607,6 @@ class Football_Data_BuddyPress_Integration_BP {
                 echo '<div class="notice notice-error"><p>' . __('Errore download da GitHub: ', 'football-data-bp') . esc_html($tmp_file->get_error_message()) . '</p></div>';
             } else {
                 $plugin_dir = WP_PLUGIN_DIR . '/football-data-buddypress-integration';
-                // Estrai e sovrascrivi i file del plugin
                 $result = unzip_file($tmp_file, $plugin_dir);
                 if (is_wp_error($result)) {
                     echo '<div class="notice notice-error"><p>' . __('Errore estrazione ZIP: ', 'football-data-bp') . esc_html($result->get_error_message()) . '</p></div>';
