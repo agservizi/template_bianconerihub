@@ -72,6 +72,44 @@ class Football_Data_BuddyPress_Integration {
             'ajax_url' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('football_data_bp_nonce')
         ));
+
+        wp_register_script('football-data-push-sw', FOOTBALL_DATA_BP_PLUGIN_URL . 'assets/football-data-push-sw.js', array(), FOOTBALL_DATA_BP_VERSION, true);
+        wp_enqueue_script('football-data-push-register', false, array(), FOOTBALL_DATA_BP_VERSION, true);
+        echo "<script>
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.register('" . FOOTBALL_DATA_BP_PLUGIN_URL . "assets/football-data-push-sw.js').then(function(reg) {
+            console.log('Service Worker registrato:', reg);
+          });
+        }
+        function urlBase64ToUint8Array(base64String) {
+          const padding = '='.repeat((4 - base64String.length % 4) % 4);
+          const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+          const rawData = window.atob(base64);
+          const outputArray = new Uint8Array(rawData.length);
+          for (let i = 0; i < rawData.length; ++i) {
+            outputArray[i] = rawData.charCodeAt(i);
+          }
+          return outputArray;
+        }
+        window.addEventListener('load', function() {
+          if ('serviceWorker' in navigator && window.Notification) {
+            navigator.serviceWorker.ready.then(function(reg) {
+              Notification.requestPermission().then(function(permission) {
+                if (permission === 'granted') {
+                  fetch('" . admin_url('admin-ajax.php') . "', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: 'action=football_data_register_push&nonce=' + football_data_bp.nonce + '&subscription=' + encodeURIComponent(JSON.stringify(reg.pushManager.subscribe({
+                      userVisibleOnly: true,
+                      applicationServerKey: urlBase64ToUint8Array('BL_URgSP4KSLyns4JyUx3vE82Ejn6Pd0XCFNmaVuRPhHf8dQDf4Tz8Q9WRUx7yn_efcj6szI4UGObNdcndVTxws')
+                    }))
+                  })
+                }
+              });
+            });
+          }
+        });
+        </script>";
     }
 
     public function enqueue_admin_scripts($hook) {

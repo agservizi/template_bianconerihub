@@ -44,6 +44,10 @@ class Football_Data_BuddyPress_Integration_BP {
         // Aggiungi selettore partita Juventus al modulo attività BuddyPress
         add_action('bp_activity_post_form_options', array($this, 'add_juventus_match_selector'));
         add_action('bp_activity_posted_update', array($this, 'save_juventus_match_to_activity'), 10, 3);
+
+        // Invia notifiche push agli utenti quando la Juventus gioca, segna o termina una partita
+        add_action('init', array($this, 'send_juventus_push_notifications'));
+        add_action('wp_ajax_football_data_register_push', array($this, 'ajax_register_push_subscription'));
     }
 
     /**
@@ -412,6 +416,12 @@ class Football_Data_BuddyPress_Integration_BP {
             update_option('football_data_view_compact', isset($_POST['view_compact']) ? 1 : 0);
             update_option('football_data_enable_csv', isset($_POST['enable_csv']) ? 1 : 0);
             update_option('football_data_enable_email', isset($_POST['enable_email']) ? 1 : 0);
+            update_option('football_data_enable_push', isset($_POST['enable_push']) ? 1 : 0);
+            // Salva VAPID keys per notifiche push
+            if (isset($_POST['vapid_public']) && isset($_POST['vapid_private'])) {
+                update_option('football_data_vapid_public', sanitize_text_field($_POST['vapid_public']));
+                update_option('football_data_vapid_private', sanitize_text_field($_POST['vapid_private']));
+            }
             echo '<div class="notice notice-success"><p>' . __('Impostazioni salvate', 'football-data-bp') . '</p></div>';
         }
 
@@ -429,6 +439,9 @@ class Football_Data_BuddyPress_Integration_BP {
         $view_compact = get_option('football_data_view_compact', 0);
         $enable_csv = get_option('football_data_enable_csv', 0);
         $enable_email = get_option('football_data_enable_email', 0);
+        $enable_push = get_option('football_data_enable_push', 0);
+        $vapid_public = get_option('football_data_vapid_public', '');
+        $vapid_private = get_option('football_data_vapid_private', '');
         ?>
         <div class="wrap">
             <h1><?php _e('Impostazioni Football Data', 'football-data-bp'); ?></h1>
@@ -485,6 +498,12 @@ class Football_Data_BuddyPress_Integration_BP {
                 echo '<div class="notice notice-success"><p>' . __('Notifiche email Juventus attive.', 'football-data-bp') . '</p></div>';
             } else {
                 echo '<div class="notice notice-warning"><p>' . __('Notifiche email Juventus non attive.', 'football-data-bp') . '</p></div>';
+            }
+            // Notifiche push
+            if (get_option('football_data_enable_push', 0)) {
+                echo '<div class="notice notice-success"><p>' . __('Notifiche push Juventus attive.', 'football-data-bp') . '</p></div>';
+            } else {
+                echo '<div class="notice notice-warning"><p>' . __('Notifiche push Juventus non attive.', 'football-data-bp') . '</p></div>';
             }
             ?>
             <form method="post">
@@ -547,6 +566,26 @@ class Football_Data_BuddyPress_Integration_BP {
                         <th scope="row"><?php _e('Notifiche email', 'football-data-bp'); ?></th>
                         <td>
                             <label><input type="checkbox" name="enable_email" value="1" <?php checked($enable_email, 1); ?>> Invia email agli utenti quando la Juventus gioca</label>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php _e('Notifiche push', 'football-data-bp'); ?></th>
+                        <td>
+                            <label><input type="checkbox" name="enable_push" value="1" <?php checked($enable_push, 1); ?>> Invia notifiche push agli utenti quando la Juventus gioca, segna o termina una partita</label>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php _e('VAPID Public Key', 'football-data-bp'); ?></th>
+                        <td>
+                            <input type="text" name="vapid_public" value="<?php echo esc_attr($vapid_public); ?>" class="regular-text">
+                            <p class="description"><?php _e('Inserisci la tua VAPID Public Key per le notifiche push', 'football-data-bp'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php _e('VAPID Private Key', 'football-data-bp'); ?></th>
+                        <td>
+                            <input type="text" name="vapid_private" value="<?php echo esc_attr($vapid_private); ?>" class="regular-text">
+                            <p class="description"><?php _e('Inserisci la tua VAPID Private Key per le notifiche push', 'football-data-bp'); ?></p>
                         </td>
                     </tr>
                 </table>
@@ -727,5 +766,106 @@ class Football_Data_BuddyPress_Integration_BP {
             }
         }
     }
+
+    /**
+     * Invia notifiche push agli utenti quando la Juventus gioca, segna o termina una partita
+     */
+    public function send_juventus_push_notifications() {
+        if (!get_option('football_data_enable_push', 0)) return;
+        $matches = $this->api->get_juventus_matches(array('limit' => 1));
+        if (isset($matches['matches'][0])) {
+            $match = $matches['matches'][0];
+            // Notifica inizio partita
+            if ($match['status'] === 'SCHEDULED') {
+                $title = 'Juventus: partita in programma!';
+                $body = 'Juventus vs ' . $match['awayTeam']['name'] . ' il ' . date('d/m/Y H:i', strtotime($match['utcDate'])) . ' (' . $match['competition']['name'] . ')';
+                $icon = FOOTBALL_DATA_BP_PLUGIN_URL . 'assets/icons/kickoff.png';
+                $this->send_web_push_to_all($title, $body, $icon);
+            }
+            // Notifica goal
+            if ($match['status'] === 'IN_PLAY' && isset($match['score']['fullTime']['home'])) {
+                $title = 'GOAL Juventus!';
+                $body = 'Juventus ha segnato contro ' . $match['awayTeam']['name'] . ' (' . $match['score']['fullTime']['home'] . '-' . $match['score']['fullTime']['away'] . ')';
+                $icon = FOOTBALL_DATA_BP_PLUGIN_URL . 'assets/icons/goal.png';
+                $this->send_web_push_to_all($title, $body, $icon);
+            }
+            // Notifica fine partita
+            if ($match['status'] === 'FINISHED') {
+                $title = 'Juventus: partita terminata';
+                $body = 'Risultato finale: Juventus ' . $match['score']['fullTime']['home'] . ' - ' . $match['awayTeam']['name'] . ' ' . $match['score']['fullTime']['away'];
+                $icon = FOOTBALL_DATA_BP_PLUGIN_URL . 'assets/icons/final.png';
+                $this->send_web_push_to_all($title, $body, $icon);
+            }
+            // Notifica cartellini
+            if (isset($match['events']) && is_array($match['events'])) {
+                foreach ($match['events'] as $ev) {
+                    if ($ev['type'] === 'YELLOW_CARD') {
+                        $title = 'Cartellino giallo Juventus';
+                        $body = $ev['player']['name'] . ' ha ricevuto un cartellino giallo.';
+                        $icon = FOOTBALL_DATA_BP_PLUGIN_URL . 'assets/icons/yellow.png';
+                        $this->send_web_push_to_all($title, $body, $icon);
+                    }
+                    if ($ev['type'] === 'RED_CARD') {
+                        $title = 'Cartellino rosso Juventus';
+                        $body = $ev['player']['name'] . ' ha ricevuto un cartellino rosso.';
+                        $icon = FOOTBALL_DATA_BP_PLUGIN_URL . 'assets/icons/red.png';
+                        $this->send_web_push_to_all($title, $body, $icon);
+                    }
+                }
+            }
+            // Notifica sostituzioni, rigori e statistiche live
+            if (isset($match['events']) && is_array($match['events'])) {
+                foreach ($match['events'] as $ev) {
+                    if ($ev['type'] === 'SUBSTITUTION') {
+                        $title = 'Sostituzione Juventus';
+                        $body = $ev['player']['name'] . ' entra/esce dal campo.';
+                        $icon = FOOTBALL_DATA_BP_PLUGIN_URL . 'assets/icons/substitution.png';
+                        $this->send_web_push_to_all($title, $body, $icon);
+                    }
+                    if ($ev['type'] === 'PENALTY') {
+                        $title = 'Rigore Juventus';
+                        $body = 'Rigore per Juventus: ' . $ev['player']['name'];
+                        $icon = FOOTBALL_DATA_BP_PLUGIN_URL . 'assets/icons/penalty.png';
+                        $this->send_web_push_to_all($title, $body, $icon);
+                    }
+                    if ($ev['type'] === 'POSSESSION') {
+                        $title = 'Possesso palla Juventus';
+                        $body = 'Possesso palla: ' . $ev['value'] . '%';
+                        $icon = FOOTBALL_DATA_BP_PLUGIN_URL . 'assets/icons/possession.png';
+                        $this->send_web_push_to_all($title, $body, $icon);
+                    }
+                }
+            }
+        }
+    }
+
+    private function send_web_push_to_all($title, $body, $icon = null) {
+        require_once __DIR__ . '/../vendor/autoload.php';
+        $vapid = array(
+            'subject' => 'mailto:noreply@bianconerihub.com',
+            'publicKey' => get_option('football_data_vapid_public', ''),
+            'privateKey' => get_option('football_data_vapid_private', '')
+        );
+        $webPush = new \Minishlink\WebPush\WebPush($vapid);
+        $users = get_users(array('meta_key' => 'football_data_push_subscription'));
+        foreach ($users as $user) {
+            $subscription = get_user_meta($user->ID, 'football_data_push_subscription', true);
+            if ($subscription) {
+                $sub = json_decode($subscription, true);
+                $notification = [
+                    'title' => $title,
+                    'body' => $body,
+                    'icon' => $icon ?: get_site_icon_url(),
+                    'url' => home_url()
+                ];
+                $webPush->sendNotification(
+                    $sub,
+                    json_encode($notification)
+                );
+            }
+        }
+        foreach ($webPush->flush() as $report) {
+            // Gestione report invio notifiche se necessario
+        }
+    }
 }
-?>
